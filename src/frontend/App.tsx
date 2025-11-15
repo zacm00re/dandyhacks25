@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
+// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ArrowUpIcon } from "lucide-react";
+import "./index.css";
+import { useChat } from "@ai-sdk/react";
+import { Chat } from "@/components/ui/chat";
+import Emails from "@/components/Emails";
 
 interface DataItem {
   id: number;
@@ -43,78 +45,51 @@ function App() {
       console.error("Error fetching data:", error);
     }
   };
-
+  type Message = {
+    id: number;
+    content: string;
+    type: "user" | "system";
+  };
   useEffect(() => {
     checkPythonBackend();
     fetchData();
   }, []);
 
+  /* Agent chat */
+  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
+    useChat({
+      api: "http://localhost:7878/api/data",
+    });
+  // const isLoading = status === "submitted" || status === "streaming";
+
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Electron + React + Python App</CardTitle>
-            <CardDescription>
-              Boilerplate with shadcn/ui components
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div
-                  className={`h-3 w-3 rounded-full ${
-                    pythonStatus === "pong" ? "bg-green-500" : "bg-red-500"
-                  }`}
-                />
-                <span className="text-sm">Python Backend: {pythonStatus}</span>
-              </div>
-              <Button onClick={checkPythonBackend} variant="outline" size="sm">
-                Refresh
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="font-semibold">Data from Python API:</h3>
-              <div className="grid gap-2">
-                {data.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 border rounded-md bg-secondary/50"
-                  >
-                    {item.name}
-                  </div>
-                ))}
-              </div>
-              <Button onClick={fetchData} variant="secondary" size="sm">
-                Fetch Data
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Get Started</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Edit{" "}
-              <code className="px-1 py-0.5 bg-muted rounded">
-                src/frontend/App.tsx
-              </code>{" "}
-              to modify the UI
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Edit{" "}
-              <code className="px-1 py-0.5 bg-muted rounded">
-                src/backend/main.py
-              </code>{" "}
-              to modify the API
-            </p>
-          </CardContent>
-        </Card>
+    <div className="flex h-screen">
+      {/* Right Panel - Chat */}
+      <div className="w-3/5 py-4 border-l">
+        <div className="h-1/3 border-b">
+          <p className="text-lg pb-2 pl-4">Emails</p>
+          <Emails></Emails>
+        </div>
+        <div className="h-1/3 py-4 border-b">
+          <p className="text-lg pb-2 pl-4">Events</p>
+        </div>
+        <div className="h-1/3 py-4">
+          <p className="text-lg pb-2 pl-4">Tasks</p>
+        </div>
       </div>
+      {/*<div className="w-1/3">*/}
+      <Chat
+        className="p-4"
+        messages={messages}
+        input={input}
+        handleInputChange={handleInputChange}
+        handleSubmit={handleSubmit}
+        isGenerating={isLoading} // ✅ Pass isLoading here
+        stop={stop}
+      />
+      {/* Left Panel - Daily Digest */}
+
+      {/*</div>*/}
     </div>
   );
 }

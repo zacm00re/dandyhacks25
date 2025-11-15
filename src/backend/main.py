@@ -1,6 +1,13 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import asyncio
+import json
+
 import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from openai import OpenAI
+
+client = OpenAI(api_key="")
 
 app = FastAPI()
 
@@ -13,19 +20,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/ping")
 async def ping():
     return {"message": "pong", "status": "ok"}
 
-@app.get("/api/data")
-async def get_data():
-    return {
-        "data": [
-            {"id": 1, "name": "Item 1"},
-            {"id": 2, "name": "Item 2"},
-            {"id": 3, "name": "Item 3"}
-        ]
-    }
+
+@app.post("/api/data")
+async def chat(request: Request):
+    try:
+        data = await request.json()
+        messages = data.get("messages", [])
+
+        # Create the stream
+        stream = client.chat.completions.create(
+            model="gpt-4",  # Use actual OpenAI model
+            messages=messages,
+            stream=True,
+        )
+
+        def generate():
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    # Format for Vercel AI SDK
+                    yield f"0:{json.dumps(content)}\n"
+
+        return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+
+    except Exception as e:
+        print("error: " + str(e))
+        return {"error": str(e)}
+
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run("main:app", host="127.0.0.1", port=7878, reload=True)
