@@ -349,6 +349,4 @@ def retrieve_top_chunks(user, query_embedding, top_k=5, file_filter: str | None 
     top_chunks = sorted(similarities, key=lambda x: x["similarity"], reverse=True)[:top_k]
     return top_chunks
 
-for chunk in process_user_input_stream("Make flashcards about RNA", "jkdev", None, None):
-    print(chunk)
    
