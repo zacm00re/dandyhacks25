@@ -1,13 +1,13 @@
-import os
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 from dotenv import load_dotenv
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 
 # Load variables from .env if present
 load_dotenv()
@@ -15,13 +15,15 @@ load_dotenv()
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/tasks"
+    "https://www.googleapis.com/auth/tasks",
 ]
+
 
 def _get_credentials():
     creds = None
     token_path = "token.json"
-    credentials_path = "credentials.json"
+    # crede?ntials_path = "credentials.json"
+    credentials = json.dumps(os.getenv("GOOGLE_CREDS"))
 
     if os.path.exists(token_path):
         creds = Credentials.from_authorized_user_file(token_path, SCOPES)
@@ -30,26 +32,32 @@ def _get_credentials():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            if not os.path.exists(credentials_path):
+            if not (credentials):
                 raise FileNotFoundError(
-                    "credentials.json not found. Create OAuth credentials for the Google Calendar API and place the file next to this script."
+                    "credentials not found. Create OAuth credentials for the Google Calendar API and place the file next to this script."
                 )
-            flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
+            flow = InstalledAppFlow.from_client_config(credentials, SCOPES)
             creds = flow.run_local_server(port=0)
         with open(token_path, "w") as token:
             token.write(creds.to_json())
 
     return creds
 
+
 def get_events_service():
     creds = _get_credentials()
     return build("calendar", "v3", credentials=creds)
+
+
 def get_tasks_service():
     creds = _get_credentials()
     return build("tasks", "v1", credentials=creds)
+
+
 def get_gmail_service():
     creds = _get_credentials()
     return build("gmail", "v1", credentials=creds)
+
 
 def build_event_from_data(data: Dict[str, Any]) -> Dict[str, Any]:
     title = data.get("title") or "Untitled"
@@ -73,8 +81,14 @@ def build_event_from_data(data: Dict[str, Any]) -> Dict[str, Any]:
     event: Dict[str, Any] = {
         "summary": title,
         "description": notes,
-        "start": {"dateTime": start_utc.isoformat().replace("+00:00", "Z"), "timeZone": "UTC"},
-        "end": {"dateTime": end_utc.isoformat().replace("+00:00", "Z"), "timeZone": "UTC"},
+        "start": {
+            "dateTime": start_utc.isoformat().replace("+00:00", "Z"),
+            "timeZone": "UTC",
+        },
+        "end": {
+            "dateTime": end_utc.isoformat().replace("+00:00", "Z"),
+            "timeZone": "UTC",
+        },
     }
 
     repeat = data.get("repeat")
@@ -83,7 +97,10 @@ def build_event_from_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return event
 
-def add_event(data: Dict[str, Any], calendar_id: str = "primary", service=None) -> Dict[str, Any]:
+
+def add_event(
+    data: Dict[str, Any], calendar_id: str = "primary", service=None
+) -> Dict[str, Any]:
     event_body = build_event_from_data(data)
     dry_run = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
 
@@ -99,51 +116,57 @@ def add_event(data: Dict[str, Any], calendar_id: str = "primary", service=None) 
     print("Event created:", created.get("htmlLink"))
     return created
 
+
 def read_emails(days: int = 2, service=None) -> list:
     """
     Read all emails from the last X days.
-    
+
     Args:
         days: Number of days to look back (default: 7)
         service: Gmail service instance (optional)
-    
+
     Returns:
         List of email data dictionaries with id, subject, from, date, and snippet
     """
-    
+
     from datetime import timedelta
 
     if service is None:
         service = get_gmail_service()
-    
+
     # Calculate the date X days ago
     cutoff_date = datetime.now() - timedelta(days=days)
     query = f"after:{cutoff_date.strftime('%Y/%m/%d')} category:primary"
-    
-    dry_run = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
-    
-    if dry_run:
-        print(f"[DRY_RUN] Would fetch emails from last {days} days with query: {query}")
-        return {"dryRun": True, "query": query}
-    
+
+    # dry_run = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
+
+    # if dry_run:
+    #     print(f"[DRY_RUN] Would fetch emails from last {days} days with query: {query}")
+    #     return {"dryRun": True, "query": query}
+
     emails = []
-    
+
     try:
         # List messages matching the query
-        results = service.users().messages().list(userId='me', q=query).execute()
-        messages = results.get('messages', [])
-        
+        results = service.users().messages().list(userId="me", q=query).execute()
+        messages = results.get("messages", [])
+
         print(f"Found {len(messages)} emails from the last {days} days")
-        
+
         # Fetch details for each message
         for msg in messages:
-            msg_data = service.users().messages().get(userId='me', id=msg['id'], format='full').execute()
-            
+            msg_data = (
+                service.users()
+                .messages()
+                .get(userId="me", id=msg["id"], format="full")
+                .execute()
+            )
+
             # headers = msg_data['payload']['headers']
             # subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
             # from_email = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown')
             # date = next((h['value'] for h in headers if h['name'].lower() == 'date'), 'Unknown')
-            
+
             # email_info = {
             #     'id': msg['id'],
             #     'subject': subject,
@@ -151,14 +174,15 @@ def read_emails(days: int = 2, service=None) -> list:
             #     'date': date,
             #     'snippet': msg_data.get('snippet', '')
             # }
-            
+
             emails.append(msg_data)
-        
+
         return emails
-        
+
     except Exception as e:
         print(f"Error reading emails: {e}")
         return []
+
 
 def write_email(data: Dict[str, Any], service=None) -> Dict[str, Any]:
     """
@@ -166,8 +190,8 @@ def write_email(data: Dict[str, Any], service=None) -> Dict[str, Any]:
     Expects data dict with keys: to, cc, bcc, subject, body
     """
     import base64
-    from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
 
     dry_run = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
     if service is None:
@@ -180,7 +204,9 @@ def write_email(data: Dict[str, Any], service=None) -> Dict[str, Any]:
     body = data.get("body", "").strip()
 
     if not to or not subject or not body:
-        raise ValueError("'to', 'subject', and 'body' are required fields for sending email.")
+        raise ValueError(
+            "'to', 'subject', and 'body' are required fields for sending email."
+        )
 
     # Build MIME message
     message = MIMEMultipart()
@@ -197,12 +223,18 @@ def write_email(data: Dict[str, Any], service=None) -> Dict[str, Any]:
 
     if dry_run:
         print("[DRY_RUN] Would send email:")
-        print(json.dumps({"to": to, "cc": cc, "bcc": bcc, "subject": subject, "body": body}, indent=2))
+        print(
+            json.dumps(
+                {"to": to, "cc": cc, "bcc": bcc, "subject": subject, "body": body},
+                indent=2,
+            )
+        )
         return {"dryRun": True, "email": msg_body}
 
     sent = service.users().messages().send(userId="me", body=msg_body).execute()
     print("Email sent! Message ID:", sent.get("id"))
     return sent
+
 
 def build_task_from_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -239,7 +271,10 @@ def build_task_from_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return task
 
-def add_task(data: Dict[str, Any], tasklist_id: str = "@default", service=None) -> Dict[str, Any]:
+
+def add_task(
+    data: Dict[str, Any], tasklist_id: str = "@default", service=None
+) -> Dict[str, Any]:
     """
     Create a Google Task in the specified task list (default: primary "@default").
     Respects DRY_RUN env var.
@@ -258,6 +293,7 @@ def add_task(data: Dict[str, Any], tasklist_id: str = "@default", service=None) 
     created = service.tasks().insert(tasklist=tasklist_id, body=task_body).execute()
     print("Task created:", created.get("id"))
     return created
+
 
 if __name__ == "__main__":
     # with open("input.json", "r") as file:

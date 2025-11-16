@@ -1,13 +1,18 @@
 import asyncio
 import json
+import os
 
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
 
-client = OpenAI(api_key="")
+load_dotenv()
+openai_key = os.environ.get("OPENAI_KEY")
+print(openai_key)
+client = OpenAI(api_key=openai_key)
 
 app = FastAPI()
 

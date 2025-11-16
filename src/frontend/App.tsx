@@ -9,6 +9,8 @@ import "./index.css";
 import { useChat } from "@ai-sdk/react";
 import { Chat } from "@/components/ui/chat";
 import Emails from "@/components/Emails";
+import { GoogleLogin } from "@react-oauth/google";
+import { jwtDecode } from "jwt-decode";
 
 interface DataItem {
   id: number;
@@ -16,44 +18,44 @@ interface DataItem {
 }
 
 function App() {
-  const [pythonStatus, setPythonStatus] = useState<string>("Checking...");
-  const [data, setData] = useState<DataItem[]>([]);
+  // const [pythonStatus, setPythonStatus] = useState<string>("Checking...");
+  // const [data, setData] = useState<DataItem[]>([]);
 
-  const checkPythonBackend = async () => {
-    try {
-      if (window.electron) {
-        const result = await window.electron.pingPython();
-        setPythonStatus(result.message || "Connected");
-      } else {
-        // Direct fetch for web development mode
-        const response = await fetch("http://localhost:8000/ping");
-        const result = await response.json();
-        setPythonStatus(result.message || "Connected");
-      }
-    } catch (error) {
-      setPythonStatus("Disconnected");
-      console.error("Error connecting to Python backend:", error);
-    }
-  };
+  // const checkPythonBackend = async () => {
+  //   try {
+  //     if (window.electron) {
+  //       const result = await window.electron.pingPython();
+  //       setPythonStatus(result.message || "Connected");
+  //     } else {
+  //       // Direct fetch for web development mode
+  //       const response = await fetch("http://localhost:8000/ping");
+  //       const result = await response.json();
+  //       setPythonStatus(result.message || "Connected");
+  //     }
+  //   } catch (error) {
+  //     setPythonStatus("Disconnected");
+  //     console.error("Error connecting to Python backend:", error);
+  //   }
+  // };
 
-  const fetchData = async () => {
-    try {
-      const response = await fetch("http://localhost:8000/api/data");
-      const result = await response.json();
-      setData(result.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
-  type Message = {
-    id: number;
-    content: string;
-    type: "user" | "system";
-  };
-  useEffect(() => {
-    checkPythonBackend();
-    fetchData();
-  }, []);
+  // const fetchData = async () => {
+  //   try {
+  //     const response = await fetch("http://localhost:8000/api/data");
+  //     const result = await response.json();
+  //     setData(result.data);
+  //   } catch (error) {
+  //     console.error("Error fetching data:", error);
+  //   }
+  // };
+  // type Message = {
+  //   id: number;
+  //   content: string;
+  //   type: "user" | "system";
+  // };
+  // useEffect(() => {
+  //   checkPythonBackend();
+  //   fetchData();
+  // }, []);
 
   /* Agent chat */
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
@@ -61,35 +63,58 @@ function App() {
       api: "http://localhost:7878/api/data",
     });
   // const isLoading = status === "submitted" || status === "streaming";
-
+  /* Google login */
+  const [googAuthed, setGoogAuthed] = useState<boolean>(false);
+  let userInfo = {
+    name: "",
+  };
+  //
   return (
     <div className="flex h-screen">
-      {/* Right Panel - Chat */}
-      <div className="w-3/5 py-4 border-l">
-        <div className="h-1/3 border-b">
-          <p className="text-lg pb-2 pl-4">Emails</p>
-          <Emails></Emails>
+      {/* LEFT - GOOGLE */}
+      {googAuthed ? (
+        <div className="w-3/5 py-4 border-r">
+          <div className="h-1/3 border-b">
+            <p className="text-lg pb-2 pl-4">Emails</p>
+            <Emails></Emails>
+          </div>
+          <div className="h-1/3 py-4 border-b">
+            <p className="text-lg pb-2 pl-4">Events</p>
+          </div>
+          <div className="h-1/3 py-4">
+            <p className="text-lg pb-2 pl-4">Tasks</p>
+          </div>
         </div>
-        <div className="h-1/3 py-4 border-b">
-          <p className="text-lg pb-2 pl-4">Events</p>
+      ) : (
+        <div className="w-3/5 p-4 border-r flex-col justify-center items-center">
+          <p className="pb-4 self-start text-lg">
+            Login with google to access Calendar & Mail
+          </p>
+          <GoogleLogin
+            theme="filled_black"
+            shape="pill"
+            onSuccess={(credRes) => {
+              if (!credRes.credential) throw new Error("Cred results failed");
+              let userData = jwtDecode(credRes.credential);
+              userInfo.name = userData.given_name;
+              setGoogAuthed(true);
+            }}
+            onError={() => console.log("Google auth failed")}
+          ></GoogleLogin>
         </div>
-        <div className="h-1/3 py-4">
-          <p className="text-lg pb-2 pl-4">Tasks</p>
-        </div>
+      )}
+      {/* RIGHT - CHAT */}
+      <div className="flex w-2/5">
+        <Chat
+          className="p-4"
+          messages={messages}
+          input={input}
+          handleInputChange={handleInputChange}
+          handleSubmit={handleSubmit}
+          isGenerating={isLoading} // ✅ Pass isLoading here
+          stop={stop}
+        />
       </div>
-      {/*<div className="w-1/3">*/}
-      <Chat
-        className="p-4"
-        messages={messages}
-        input={input}
-        handleInputChange={handleInputChange}
-        handleSubmit={handleSubmit}
-        isGenerating={isLoading} // ✅ Pass isLoading here
-        stop={stop}
-      />
-      {/* Left Panel - Daily Digest */}
-
-      {/*</div>*/}
     </div>
   );
 }
