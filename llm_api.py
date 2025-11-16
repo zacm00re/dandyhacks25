@@ -62,6 +62,67 @@ def extract_texts_from_df(df):
     rows = df.select("CONTENT").collect()
     return [r["CONTENT"] for r in rows]
 
+
+def process_user_input_stream(user_input, user, file_paths: list[str] | None, file_names: list[str] | None):
+    orchestrator_prompt_string = generate_prompts.get_orchestrator_prompt(user_input)
+    orch_response = run_chat(orchestrator_prompt_string)
+    classification = json.loads(orch_response)
+    agent_name = classification["agent"]
+    raw_input = classification["raw_input"]
+
+    def json_stream(json_str):
+        """Yield each item in a JSON array or dict as a separate dict."""
+        try:
+            parsed = json.loads(json_str)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    yield item
+            elif isinstance(parsed, dict):
+                yield parsed
+            else:
+                yield {"output": parsed}
+        except json.JSONDecodeError:
+            yield {"error": "Invalid JSON from LLM"}
+
+    if agent_name in ["calendar", "tasks", "course_content"]:
+        if file_paths and file_names:
+            file_data = ""
+            for i in range(len(file_paths)):
+                process_uploaded_file(file_paths[i], file_names[i], user, chunk_size=150 if agent_name != "course_content" else 500)
+                if file_paths[i]:
+                    file_data += data_preparation.read(file_paths[i])
+            vector_input = file_data
+        else:
+            query_embedding = get_embedding(raw_input)
+            vector_input = retrieve_top_chunks(user, query_embedding, file_filter='syllabus')
+
+        if agent_name == "calendar":
+            prompt = generate_prompts.get_calendar_data_prompt(calendar_input=raw_input, vector_input=vector_input)
+        elif agent_name == "tasks":
+            prompt = generate_prompts.get_task_prompt(user_input=raw_input, vector_input=vector_input)
+        else:  # course_content
+            prompt = generate_prompts.get_course_prompt(user_input=raw_input, vector_input=vector_input)
+
+        agent_response = run_chat(prompt)
+        for item in json_stream(agent_response):
+            yield {"agent": agent_name, "output": item}
+
+    elif agent_name == "email":
+        query_embedding = get_embedding(raw_input)
+        df = retrieve_email_chunks(user, query_embedding, top_k=2)
+        content = extract_texts_from_df(df)
+        prompt = generate_prompts.get_email_manager_prompt(email_input=raw_input, rag_email_context=content)
+        agent_response = run_chat(prompt)
+        for item in json_stream(agent_response):
+            yield {"agent": "email", "output": item}
+    else:
+        yield {"agent": "unknown", "output": "Could not classify input"}
+
+
+
+
+
+
 def process_user_input(user_input, user, file_paths: list[str] | None, file_names : list[str] | None):
     orchestrator_prompt_string = generate_prompts.get_orchestrator_prompt(user_input)
     orch_response = run_chat(orchestrator_prompt_string)  # LLM call
@@ -288,6 +349,6 @@ def retrieve_top_chunks(user, query_embedding, top_k=5, file_filter: str | None 
     top_chunks = sorted(similarities, key=lambda x: x["similarity"], reverse=True)[:top_k]
     return top_chunks
 
-
-print(process_user_input("Could you please make me some flashcards about Ribonucleic Acids", "jkdev", None, None))
+for chunk in process_user_input_stream("Make flashcards about RNA", "jkdev", None, None):
+    print(chunk)
    
