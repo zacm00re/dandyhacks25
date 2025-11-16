@@ -29,7 +29,8 @@ Your job is to read the user input and:
    - repeat (if no custom repeat sequence is mentioned, default to 'weekly')
 3. If the user input references a syllabus, use relevant content from the {vector_input} to inform your response. Otherwise, proceed without any external context.
 4. Note: Focus **only on events, classes, and meetings**. Ignore assignments, tasks, or other non-calendar items.
-5. Return a JSON array where each element contains:
+5. If the user does not provide a date, infer the earliest reasonable upcoming date based on the current time. Never return null for the date
+6. Return a JSON array where each element contains:
 {{
   "action": "add" or "remove",
   "title": "...",
@@ -122,7 +123,8 @@ Your job is to read the user input and:
    - repeat (if no custom repeat sequence is mentioned, default to null)
 Note: Focus **only on tasks or assignments**. Ignore events, classes, or meetings.
 3. If the user input references a syllabus, use relevant content from the {vector_input} to inform your response. Otherwise, proceed without any external context.
-4. Return a JSON array where each element contains:
+4. If the user does not provide a date, infer today. Never return Null for the date
+5. Return a JSON array where each element contains:
 {{
   "action": "add" | "complete" | "remove",
   "title": "...",

@@ -1,7 +1,8 @@
 import asyncio
 import json
 import os
-
+import sys
+import llm_api
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -9,13 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from googleapis import read_emails, read_events, read_tasks
 from openai import OpenAI
+from pathlib import Path
+import logging
 
 load_dotenv()
 openai_key = os.environ.get("OPENAI_KEY")
 print(openai_key)
 client = OpenAI(api_key=openai_key)
-
 app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)  # ← This creates the logger variable
 
 # Configure CORS
 app.add_middleware(
@@ -187,33 +191,68 @@ async def read_user_tasks(request: Request):
         print("Error:", str(e))
         return {"error": str(e)}
 
-
 @app.post("/api/data")
 async def chat(request: Request):
-    try:
-        data = await request.json()
-        messages = data.get("messages", [])
-
-        # Create the stream
-        stream = client.chat.completions.create(
-            model="gpt-4",  # Use actual OpenAI model
-            messages=messages,
-            stream=True,
-        )
-
-        def generate():
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    # Format for Vercel AI SDK
-                    yield f"0:{json.dumps(content)}\n"
-
-        return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
-
-    except Exception as e:
-        print("error: " + str(e))
-        return {"error": str(e)}
+    """
+    Main endpoint:
+    - Structured data (calendar/tasks/email) → converts to prose and streams
+    - Everything else (chitchat, unknown) → streams ChatGPT response
+    """
+    data = await request.json()  # Keep it async since you're using async def
+    
+    messages = data.get("messages", [])
+    user = data.get("user", "default_user")
+    file_paths = data.get("file_paths")
+    file_names = data.get("file_names")
+    
+    user_input = messages[-1].get("content", "") if messages else ""
+    
+    if not user_input:
+        return {"error": "Empty message"}
+    
+    def generate():
+        """Stream prose from agents or ChatGPT."""
+        try:
+            should_fallback = False
+            had_agent_output = False
+            
+            # Try specialized agents
+            for chunk in llm_api.process_user_input_stream(user_input, "jkdev" , file_paths, file_names):
+                
+                if chunk.get("fallback"):
+                    should_fallback = True
+                    logger.info("Agent failed or unknown, using ChatGPT")
+                    break
+                
+                if "output" in chunk:
+                    had_agent_output = True
+                    agent = chunk.get("agent", "unknown")
+                    output = chunk["output"]
+                    
+                    # Convert structured data to prose
+                    prose = llm_api.format_structured_data_as_prose(agent, output)
+                    
+                    # Stream word by word (like ChatGPT does)
+                    words = prose.split()
+                    for i, word in enumerate(words):
+                        text = word + (" " if i < len(words) - 1 else "")
+                        yield f"0:{json.dumps(text)}\n"
+            
+            # Use ChatGPT if agent failed or couldn't classify
+            if should_fallback or not had_agent_output:
+                logger.info("Streaming ChatGPT response")
+                for text_chunk in llm_api.chatgpt_stream(user_input, messages):
+                    yield f"0:{json.dumps(text_chunk)}\n"
+                    
+        except Exception as e:
+            logger.exception(f"Stream error: {e}")
+            # Always fallback to ChatGPT on error
+            for text_chunk in llm_api.chatgpt_stream(user_input, messages):
+                yield f"0:{json.dumps(text_chunk)}\n"
+    
+    return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
 
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=7878, reload=True)
