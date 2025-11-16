@@ -12,8 +12,11 @@ import { Sparkles } from "lucide-react";
 interface Email {
   id: number;
   sender: string;
-  content: string;
-  date: string;
+  subject: string;
+  snippet: string;
+  body: string;
+  date: any;
+  summary: string;
 }
 
 export default function Emails() {
@@ -29,16 +32,27 @@ export default function Emails() {
     try {
       setLoading(true);
       // Replace with your actual API endpoint
-      const response = await fetch("https://api.example.com/emails");
+      const accessToken = localStorage.getItem("google_access_token");
+      const response = await fetch("http://localhost:7878/api/get_emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          access_token: accessToken,
+          days: 2,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch emails");
       }
 
       const data = await response.json();
-      setEmails(data);
+      console.log("098234098234098324");
+      console.log(data);
+      setEmails(data.emails);
       setError(null);
     } catch (err: any) {
+      console.log(err);
       setError(err.message);
       // Fallback to mock data for demonstration
       setEmails([
@@ -127,7 +141,7 @@ export default function Emails() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-700 line-clamp-4">
-                  {email.content}
+                  {email.summary}
                 </p>
               </CardContent>
             </Card>

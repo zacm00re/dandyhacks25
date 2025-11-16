@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from googleapis import read_emails
 from openai import OpenAI
 
 load_dotenv()
@@ -29,6 +30,26 @@ app.add_middleware(
 @app.get("/ping")
 async def ping():
     return {"message": "pong", "status": "ok"}
+
+
+@app.post("/api/get_emails")
+async def read_user_emails(request: Request):
+    try:
+        data = await request.json()
+        access_token = data.get("access_token")
+        days = data.get("days", 2)
+
+        if not access_token:
+            return {"error": "access_token is required"}
+
+        # Use the access token to read emails
+        emails = read_emails(days=days, access_token=access_token)
+        print(json.dumps(emails[0], indent="4"))
+        return {"emails": emails, "count": len(emails)}
+
+    except Exception as e:
+        print("Error:", str(e))
+        return {"error": str(e)}
 
 
 @app.post("/api/data")

@@ -9,8 +9,11 @@ import "./index.css";
 import { useChat } from "@ai-sdk/react";
 import { Chat } from "@/components/ui/chat";
 import Emails from "@/components/Emails";
-import { GoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
+
+const SCOPES =
+  "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/tasks";
 
 interface DataItem {
   id: number;
@@ -64,6 +67,27 @@ function App() {
     });
   // const isLoading = status === "submitted" || status === "streaming";
   /* Google login */
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      // tokenResponse.access_token - use this for Gmail/Calendar APIs
+      console.log("Access Token:", tokenResponse.access_token);
+      localStorage.setItem("google_access_token", tokenResponse.access_token);
+
+      // Get user info from Google's userinfo endpoint
+      const userInfoResponse = await fetch(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        },
+      );
+      const userData = await userInfoResponse.json();
+
+      userInfo.name = userData.given_name;
+      setGoogAuthed(true);
+    },
+    onError: () => console.log("Google auth failed"),
+    scope: SCOPES,
+  });
   const [googAuthed, setGoogAuthed] = useState<boolean>(false);
   let userInfo = {
     name: "",
@@ -90,17 +114,13 @@ function App() {
           <p className="pb-4 self-start text-lg">
             Login with google to access Calendar & Mail
           </p>
-          <GoogleLogin
-            theme="filled_black"
-            shape="pill"
-            onSuccess={(credRes) => {
-              if (!credRes.credential) throw new Error("Cred results failed");
-              let userData = jwtDecode(credRes.credential);
-              userInfo.name = userData.given_name;
-              setGoogAuthed(true);
-            }}
-            onError={() => console.log("Google auth failed")}
-          ></GoogleLogin>
+          <button
+            onClick={login}
+            className="bg-black text-white px-6 py-3 rounded-full flex items-center gap-2"
+          >
+            {/* Add a Google icon here if you want */}
+            Sign in with Google
+          </button>
         </div>
       )}
       {/* RIGHT - CHAT */}
