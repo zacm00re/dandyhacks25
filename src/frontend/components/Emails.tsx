@@ -7,7 +7,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Loader2 } from "lucide-react";
+import { Button } from "./ui/button";
 
 interface Email {
   id: number;
@@ -19,10 +20,26 @@ interface Email {
   summary: string;
 }
 
+async function summarizeEmail(emailBody: string) {
+  const response = await fetch("http://localhost:7878/api/summarize_email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      emailBody: emailBody,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to summarize email");
+  }
+  const text = await response.text();
+  return text;
+}
+
 export default function Emails() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [summarizingIds, setSummarizingIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetchEmails();
@@ -31,7 +48,6 @@ export default function Emails() {
   const fetchEmails = async () => {
     try {
       setLoading(true);
-      // Replace with your actual API endpoint
       const accessToken = localStorage.getItem("google_access_token");
       const response = await fetch("http://localhost:7878/api/get_emails", {
         method: "POST",
@@ -49,51 +65,46 @@ export default function Emails() {
       const data = await response.json();
       console.log("098234098234098324");
       console.log(data);
-      setEmails(data.emails);
+      setEmails(data);
       setError(null);
     } catch (err: any) {
       console.log(err);
       setError(err.message);
-      // Fallback to mock data for demonstration
       setEmails([
         {
           id: 1,
           sender: "john@example.com",
-          content:
-            "Hey! Just wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to fst wanted to follow up on our meeting yesterday. Let me know if you have any questions.",
+          subject: "Follow up",
+          snippet: "Hey! Just wanted to follow up on our meeting yesterday...",
+          body: "Hey! Just wanted to follow up on our meeting yesterday. Let me know if you have any questions.",
           date: "2025-11-14",
-        },
-        {
-          id: 2,
-          sender: "sarah@company.com",
-          content:
-            "The quarterly report is ready for review. Please check the attached documents.",
-          date: "2025-11-13",
-        },
-        {
-          id: 3,
-          sender: "notifications@service.com",
-          content:
-            "Your subscription will renew on November 20th. Update your payment method if needed.",
-          date: "2025-11-12",
-        },
-        {
-          id: 4,
-          sender: "team@startup.io",
-          content:
-            "Congratulations! Your application has been approved. Welcome to the team!",
-          date: "2025-11-11",
-        },
-        {
-          id: 5,
-          sender: "support@platform.com",
-          content:
-            "We have received your support ticket. Our team will get back to you within 24 hours.",
-          date: "2025-11-10",
+          summary: "",
         },
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSummarize = async (emailId: number, emailBody: string) => {
+    setSummarizingIds((prev) => new Set(prev).add(emailId));
+
+    try {
+      const summary = await summarizeEmail(emailBody);
+
+      setEmails((prevEmails) =>
+        prevEmails.map((email) =>
+          email.id === emailId ? { ...email, summary } : email,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to summarize email:", error);
+    } finally {
+      setSummarizingIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(emailId);
+        return newSet;
+      });
     }
   };
 
@@ -116,36 +127,66 @@ export default function Emails() {
 
   return (
     <div className="w-full pl-4 ">
-      {/*{error && (
-        <Alert className="mb-4">
-          <AlertDescription>
-            Failed to fetch from API. Showing sample data instead.
-          </AlertDescription>
-        </Alert>
-      )}*/}
-
       <div className="relative">
         <div className="flex gap-4 overflow-x-auto pb-0 snap-x snap-mandatory">
-          {emails.map((email) => (
-            <Card
-              key={email.id}
-              className="flex-shrink-0 w-80 snap-start hover:shadow-lg transition-shadow"
-            >
-              <CardHeader>
-                <CardTitle className="text-lg truncate">
-                  {email.sender}
-                </CardTitle>
-                <CardDescription className="text-sm">
-                  {formatDate(email.date)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-700 line-clamp-4">
-                  {email.summary}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+          {emails.map((email) => {
+            const isSummarizing = summarizingIds.has(email.id);
+            const hasSummary = !!email.summary;
+            const displayText = email.summary || email.snippet;
+
+            return (
+              <Card
+                key={email.id}
+                className="h-full flex-shrink-0 w-80 snap-start hover:shadow-lg transition-shadow"
+              >
+                <CardHeader className="pb-0">
+                  <CardTitle className="text-md truncate">
+                    {email.sender}
+                  </CardTitle>
+                  <CardDescription className="flex justify-between text-sm">
+                    {formatDate(email.date)}
+                    {!hasSummary && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          handleSummarize(
+                            email.id,
+                            email.body || email.snippet,
+                          );
+                        }}
+                        disabled={isSummarizing}
+                      >
+                        {isSummarizing ? (
+                          <Loader2 className="animate-spin" color="#1447e6" />
+                        ) : (
+                          <Sparkles color="#1447e6" />
+                        )}
+                      </Button>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isSummarizing ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating summary...
+                    </div>
+                  ) : (
+                    <p
+                      className={`text-sm line-clamp-4 ${
+                        hasSummary
+                          ? "text-blue-600 font-medium"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {displayText}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 

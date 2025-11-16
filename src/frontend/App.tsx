@@ -11,6 +11,8 @@ import { Chat } from "@/components/ui/chat";
 import Emails from "@/components/Emails";
 import { useGoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
+// import * as dotenv from "dotenv";
+// dotenv.config();
 
 const SCOPES =
   "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/tasks";
@@ -98,9 +100,11 @@ function App() {
       {/* LEFT - GOOGLE */}
       {googAuthed ? (
         <div className="w-3/5 py-4 border-r">
-          <div className="h-1/3 border-b">
-            <p className="text-lg pb-2 pl-4">Emails</p>
-            <Emails></Emails>
+          <div className="h-1/3 border-b flex flex-col">
+            <p className="text-lg pb-2 pl-4 flex-shrink-0">Emails</p>
+            <div className="flex-1 overflow-hidden">
+              <Emails />
+            </div>
           </div>
           <div className="h-1/3 py-4 border-b">
             <p className="text-lg pb-2 pl-4">Events</p>
@@ -112,7 +116,7 @@ function App() {
       ) : (
         <div className="w-3/5 p-4 border-r flex-col justify-center items-center">
           <p className="pb-4 self-start text-lg">
-            Login with google to access Calendar & Mail
+            Authenticate with Google to access Calendar & Mail
           </p>
           <button
             onClick={login}
