@@ -9,6 +9,8 @@ import "./index.css";
 import { useChat } from "@ai-sdk/react";
 import { Chat } from "@/components/ui/chat";
 import Emails from "@/components/Emails";
+import Tasks from "@/components/Tasks";
+import Events from "@/components/Events";
 import { useGoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 // import * as dotenv from "dotenv";
@@ -106,11 +108,17 @@ function App() {
               <Emails />
             </div>
           </div>
-          <div className="h-1/3 py-4 border-b">
-            <p className="text-lg pb-2 pl-4">Events</p>
+          <div className="h-1/3 border-b flex flex-col">
+            <p className="text-lg py-4 pl-4 flex-shrink-0">Tasks</p>
+            <div className="flex-1 overflow-hidden">
+              <Tasks />
+            </div>
           </div>
-          <div className="h-1/3 py-4">
-            <p className="text-lg pb-2 pl-4">Tasks</p>
+          <div className="h-1/3 pt-4 flex flex-col">
+            <p className="text-lg py-4 pl-4 flex-shrink-0">Events</p>
+            <div className="flex-1 overflow-hidden">
+              <Events />
+            </div>
           </div>
         </div>
       ) : (

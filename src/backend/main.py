@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
-from googleapis import read_emails
+from googleapis import read_emails, read_events, read_tasks
 from openai import OpenAI
 
 load_dotenv()
@@ -30,35 +30,6 @@ app.add_middleware(
 def run_chat(prompt, model="gpt-5-nano"):
     response = client.responses.create(model=model, input=prompt)
     return response.output_text
-
-
-def get_top_n_emails_prompt(
-    email_data,
-    n,
-    topics="personal relations, professors, peers, time-sensitive, applications",
-):
-    email_prompt_template = """
-    You are an intelligent email assistant with the sole task of identifying important emails for undergraduate students and sorting them loosely.
-    Given the following emails:
-
-    {email_data}
-
-    Identify the top {n} most important emails. Important emails involve but are not limited to: "{topics}".
-    The following are not important: newsletters, verifications, mailing lists
-    Return exactly as a JSON array with keys:
-    - "subject"
-    - "sender"
-    - "summary"
-    - "date"
-
-    Do not include any text outside the JSON array.
-    """
-    return email_prompt_template.format(email_data=email_data, n=n, topics=topics)
-
-
-@app.get("/ping")
-async def ping():
-    return {"message": "pong", "status": "ok"}
 
 
 summaryPrompt = """You are an expert email summarizer. Create ultra-concise summaries for display in small card UI components.
@@ -93,6 +64,11 @@ Email: "The server migration initially planned for this weekend has been postpon
 Summary: Server migration moved to Nov 23 (vendor delay). No action needed."""
 
 
+@app.get("/ping")
+async def ping():
+    return {"message": "pong", "status": "ok"}
+
+
 @app.post("/api/summarize_email")
 async def summarize_email(request: Request):
     try:
@@ -124,6 +100,88 @@ async def read_user_emails(request: Request):
         emails = read_emails(days=days, access_token=access_token)
         print(json.dumps(emails[0], indent="4"))
         return emails
+
+    except Exception as e:
+        print("Error:", str(e))
+        return {"error": str(e)}
+
+
+@app.post("/api/get_events")
+async def read_user_events(request: Request):
+    try:
+        data = await request.json()
+        access_token = data.get("access_token")
+        time_min = data.get("time_min")  # Optional: ISO format datetime
+        time_max = data.get("time_max")  # Optional: ISO format datetime
+        calendar_id = data.get("calendar_id", "all")  # Optional: defaults to "all"
+
+        if not access_token:
+            return {"error": "access_token is required"}
+
+        # Parse time_min and time_max if provided
+        from datetime import datetime
+
+        parsed_time_min = None
+        parsed_time_max = None
+
+        if time_min:
+            try:
+                parsed_time_min = datetime.fromisoformat(
+                    time_min.replace("Z", "+00:00")
+                )
+            except ValueError:
+                return {"error": "Invalid time_min format. Use ISO format."}
+
+        if time_max:
+            try:
+                parsed_time_max = datetime.fromisoformat(
+                    time_max.replace("Z", "+00:00")
+                )
+            except ValueError:
+                return {"error": "Invalid time_max format. Use ISO format."}
+
+        # Use the access token to read events
+        events = read_events(
+            time_min=parsed_time_min,
+            time_max=parsed_time_max,
+            calendar_id=calendar_id,
+            access_token=access_token,
+        )
+
+        if events:
+            print(json.dumps(events[0], indent=4))
+
+        return events
+
+    except Exception as e:
+        print("Error:", str(e))
+        return {"error": str(e)}
+
+
+@app.post("/api/get_tasks")
+async def read_user_tasks(request: Request):
+    try:
+        data = await request.json()
+        access_token = data.get("access_token")
+        look_ahead_days = data.get("look_ahead_days", 7)  # Optional: defaults to 7
+        tasklist_id = data.get(
+            "tasklist_id", "@default"
+        )  # Optional: defaults to primary list
+
+        if not access_token:
+            return {"error": "access_token is required"}
+
+        # Use the access token to read tasks
+        tasks = read_tasks(
+            lookAheadDays=look_ahead_days,
+            tasklist_id=tasklist_id,
+            access_token=access_token,
+        )
+
+        if tasks:
+            print(json.dumps(tasks[0], indent=4))
+
+        return tasks
 
     except Exception as e:
         print("Error:", str(e))
