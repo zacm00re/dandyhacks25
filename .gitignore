@@ -1,19 +1,115 @@
-# Ignore Python cache files
+# Python ignores
 __pycache__/
 *.pyc
 
-# Ignore virtual environments
+# Virtual environments
 .venv/
 venv/
 
-# Ignore environment files
+# Environment files
 .env
 api.env
 
-# Ignore system files
+# System files
 .DS_Store
 
+# Project scripts
 read_file.py
-
 gmail.py
 tools.py
+
+# Node/JS logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage & instrumented libs
+lib-cov
+coverage
+*.lcov
+.nyc_output
+
+# Grunt, Bower, npm caches
+.grunt
+bower_components
+.lock-wscript
+node_modules/
+jspm_packages/
+web_modules/
+.npm
+.nyc_output
+
+# TypeScript cache
+*.tsbuildinfo
+
+# ESLint / stylelint caches
+.eslintcache
+.stylelintcache
+
+# REPL history
+.node_repl_history
+
+# Package outputs
+*.tgz
+.yarn-integrity
+
+# Parcel cache
+.cache
+.parcel-cache
+
+# Next.js / Nuxt.js / Gatsby outputs
+.next
+out
+.nuxt
+dist
+.output
+.cache/
+# public (optional for Gatsby)
+
+# VuePress / SvelteKit / VitePress outputs
+.vuepress/dist
+.temp
+.cache
+.svelte-kit/
+**/.vitepress/dist
+**/.vitepress/cache
+
+# Docusaurus cache
+.docusaurus
+
+# Serverless / build caches
+.serverless/
+.fusebox/
+.dynamodb/
+.firebase/
+.tern-port
+
+# VSCode test storage
+.vscode-test
+
+# Yarn v3
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Vite files
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.vite/
+
